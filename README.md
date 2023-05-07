@@ -40,11 +40,15 @@ python search.py --root_path D:\documents\images --image example.jpg --k 5
 
 ## webui模式
 
-
+可以使用streamlit run的方式和python脚本执行两种方式
 ```python
-streamlit run app.py
-```
+# streamlit run
+streamlit run app.py -- --root_path <root_path> [--dump_path <dump_path>] [--backup_path <backup_path>]
 
+# python脚本
+python app.py --root_path <root_path> [--dump_path <dump_path>] [--backup_path <backup_path>]
+```
+`--query` 和 `--image` 参数将在streamlit的webui中指定
 
 ## Acknowledgements
 

@@ -25,8 +25,6 @@ class Album:
             
     def update_db(self, root_path):
         new_img_paths, new_db_features = self.load_and_extract(root_path)
-        if len(new_img_paths) == 0:
-            return
         self.img_paths += new_img_paths
         self.db_features = torch.cat([self.db_features, new_db_features], dim=0)
         self.dump_db_features(self.dump_path)
@@ -78,6 +76,7 @@ class Album:
         return selected_paths, selected_probs
     
     def text_to_features(self, texts):
+        logger.info(f"Searching by text: {texts}")
         text = self.tokenizer(texts)
         with torch.no_grad(), torch.cuda.amp.autocast():
             text_features = self.model.encode_text(text)
