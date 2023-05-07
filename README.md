@@ -40,4 +40,13 @@ python search.py --root_path D:\documents\images --image example.jpg --k 5
 
 ## webui模式
 
-TODO
+
+```python
+streamlit run app.py
+```
+
+
+## Acknowledgements
+
+* [OpenAI CLIP](https://github.com/openai/CLIP)
+* [OpenClip](https://github.com/mlfoundations/open_clip)
