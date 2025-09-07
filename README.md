@@ -164,6 +164,12 @@ cd frontend
 npm run build
 ```
 
+### 实际使用
+```bash
+cd backend
+python run.py production
+```
+
 ## 🔄 版本对比
 
 | 功能 | Streamlit版本 | Flask+Vue版本 |

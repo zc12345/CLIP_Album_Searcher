@@ -27,7 +27,7 @@ class Config:
     HF_HUB_ENABLE_HF_TRANSFER = os.environ.get('HF_HUB_ENABLE_HF_TRANSFER', 'True').lower() == 'true'
     
     # API配置
-    API_VERSION = 'v1.1'
+    API_VERSION = 'v1.2'
     MAX_RESULTS = int(os.environ.get('MAX_RESULTS', 50))
     DEFAULT_THRESHOLD = float(os.environ.get('DEFAULT_THRESHOLD', 0.))
     

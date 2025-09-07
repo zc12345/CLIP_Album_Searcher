@@ -4,6 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue()],
+  base: '/',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
@@ -22,12 +23,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks: {
-          'element-plus': ['element-plus'],
-          'vue-vendor': ['vue', 'vue-router', 'pinia']
-        }
+        manualChunks: undefined,
+        // manualChunks: {
+        //   'element-plus': ['element-plus'],
+        //   'vue-vendor': ['vue', 'vue-router', 'pinia']
+        // },
       }
     }
   }

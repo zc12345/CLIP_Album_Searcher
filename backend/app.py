@@ -62,7 +62,23 @@ def get_album_instance():
 
 
 def create_app(config_name='default'):
-    app = Flask(__name__)
+    # 根据配置决定是否启用静态文件服务
+    frontend_dist = os.path.join(os.path.dirname(__file__), '../frontend/dist')
+    is_production = config_name == 'production'
+    has_frontend = is_production and os.path.exists(frontend_dist) and os.path.exists(os.path.join(frontend_dist, 'index.html'))
+    
+    if has_frontend:
+        app = Flask(__name__, 
+                    static_folder=frontend_dist,
+                    static_url_path='')
+        app.logger.info("✅ 生产环境：启用静态文件服务")
+    else:
+        app = Flask(__name__)
+        if is_production:
+            app.logger.warning("⚠️  生产环境：前端未构建，仅提供API服务")
+        else:
+            app.logger.info("🔧 开发环境：仅API服务")
+    
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
     app.logger.debug(f"config={config[config_name]}")
@@ -445,25 +461,93 @@ def create_app(config_name='default'):
     @app.route('/', methods=['GET'])
     def index():
         """首页"""
-        return jsonify({
-            'message': 'CLIP Album Search API',
-            'version': app.config["API_VERSION"],
-            'endpoints': {
-                'health': '/api/health',
-                'random_images': '/api/images/random',
-                'text_search': '/api/images/search/text',
-                'image_search': '/api/images/search/image',
-                'stats': '/api/images/stats',
-                'scan_album': '/api/album/scan',
-                'config': '/api/config',
-                'open_folder': '/api/images/open-folder'
-            }
-        })
+        if has_frontend:
+            try:
+                return app.send_static_file('index.html')
+            except:
+                # 如果无法加载前端，返回错误信息
+                return jsonify({
+                    'error': 'Failed to load frontend',
+                    'message': 'Frontend build might be missing or corrupted'
+                }), 500
+        else:
+            # 开发环境或生产环境但前端未构建：返回API信息
+            return jsonify({
+                'message': 'CLIP Album Search API',
+                'version': app.config["API_VERSION"],
+                'frontend_status': 'not_built' if is_production else 'development_mode',
+                'endpoints': {
+                    'health': '/api/health',
+                    'random_images': '/api/images/random',
+                    'text_search': '/api/images/search/text',
+                    'image_search': '/api/images/search/image',
+                    'stats': '/api/images/stats',
+                    'scan_album': '/api/album/scan',
+                    'config': '/api/config',
+                    'open_folder': '/api/images/open-folder'
+                }
+            })
     
+    # SPA路由处理（仅生产环境且有前端时）
+    if has_frontend:
+        @app.route('/<path:path>')
+        def serve_spa(path):
+            # 不处理API路由 - 这些应该已经被前面的路由处理了
+            if path.startswith('api/'):
+                return jsonify({'error': 'API route not found'}), 404
+                
+            try:
+                # 尝试返回请求的静态文件
+                return app.send_static_file(path)
+            except:
+                # 文件不存在，返回index.html由前端路由处理
+                try:
+                    return app.send_static_file('index.html')
+                except:
+                    return jsonify({
+                        'error': 'Frontend not available',
+                        'message': 'Please build the frontend: cd frontend && npm run build'
+                    }), 503
+                        
+        @app.route('/assets/<path:filename>')
+        def serve_assets(filename):
+            """服务前端静态资源"""
+            frontend_dist = os.path.join(os.path.dirname(__file__), '../frontend/dist')
+            assets_path = os.path.join(frontend_dist, 'assets', filename)
+            
+            # 安全检查
+            if not os.path.exists(assets_path) or not os.path.isfile(assets_path):
+                return jsonify({'error': 'Asset not found'}), 404
+            
+            # 根据文件扩展名设置正确的MIME类型
+            ext = os.path.splitext(filename)[1].lower()
+            mime_types = {
+                '.js': 'application/javascript',
+                '.css': 'text/css',
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+                '.svg': 'image/svg+xml',
+                '.ico': 'image/x-icon'
+            }
+            
+            mimetype = mime_types.get(ext, 'application/octet-stream')
+            
+            return send_file(assets_path, mimetype=mimetype)
+
+        # 同时确保vite.svg也能被访问
+        @app.route('/vite.svg')
+        def serve_vite_svg():
+            frontend_dist = os.path.join(os.path.dirname(__file__), '../frontend/dist')
+            vite_svg_path = os.path.join(frontend_dist, 'vite.svg')
+            
+            if os.path.exists(vite_svg_path):
+                return send_file(vite_svg_path, mimetype='image/svg+xml')
+            return jsonify({'error': 'vite.svg not found'}), 404
+
     return app
 
 if __name__ == '__main__':
-    # app = create_app('development')
-    # app.run(host='0.0.0.0', port=5000, debug=True)
-    app = create_app('production')
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app = create_app('development')
+    app.run(host='0.0.0.0', port=5000, debug=True)

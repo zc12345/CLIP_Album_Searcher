@@ -1,6 +1,6 @@
 {
   "name": "clip-album-search-frontend",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "CLIP Album Search Frontend",
   "type": "module",
   "scripts": {
