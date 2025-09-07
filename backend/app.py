@@ -1,9 +1,8 @@
 import platform
 import subprocess
 import threading
-from flask import Flask, request, jsonify, g, current_app, send_file
+from flask import Flask, request, g, current_app, jsonify, send_file
 from flask_cors import CORS
-from urllib.parse import quote, unquote
 import os
 from PIL import Image
 from datetime import datetime
@@ -109,7 +108,7 @@ def create_app(config_name='default'):
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
-            'version': '1.0.0'
+            'version': app.config["API_VERSION"]
         })
     
     @app.route('/api/images/random', methods=['GET'])
@@ -435,6 +434,7 @@ def create_app(config_name='default'):
         return jsonify({
             'success': True,
             'data': {
+                'version': app.config["API_VERSION"],
                 'root_path': album.database.root_path,
                 'dump_path': album.database.dump_path,
                 'max_results': app.config['MAX_RESULTS'],
@@ -447,7 +447,7 @@ def create_app(config_name='default'):
         """首页"""
         return jsonify({
             'message': 'CLIP Album Search API',
-            'version': '1.0.0',
+            'version': app.config["API_VERSION"],
             'endpoints': {
                 'health': '/api/health',
                 'random_images': '/api/images/random',

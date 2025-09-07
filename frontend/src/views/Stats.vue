@@ -102,7 +102,7 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="API版本">
-          <el-tag>1.0.0</el-tag>
+          <el-tag>{{ config?.version || 'N/A' }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="图片目录">
           <el-text>{{ config?.root_path || 'N/A' }}</el-text>
@@ -141,80 +141,6 @@
         </el-timeline-item>
       </el-timeline>
     </el-card>
-
-    <!-- 性能测试对话框 -->
-    <el-dialog
-      v-model="showBenchmarkDialog"
-      title="性能测试与多线程设置"
-      width="600px"
-    >
-      <div class="benchmark-content">
-        <div class="benchmark-section">
-          <h4>工作线程设置</h4>
-          <div class="worker-control">
-            <el-input-number
-              v-model="workerCount"
-              :min="1"
-              :max="16"
-              :step="1"
-              size="small"
-            />
-            <el-button
-              type="primary"
-              size="small"
-              @click="updateWorkerCount"
-              :loading="benchmarkLoading"
-            >
-              设置线程数
-            </el-button>
-          </div>
-          <div class="current-info">
-            当前线程数: {{ stats?.max_workers || 4 }}
-          </div>
-        </div>
-
-        <div class="benchmark-section">
-          <h4>性能基准测试</h4>
-          <el-button
-            type="primary"
-            @click="runBenchmark"
-            :loading="benchmarkLoading"
-          >
-            <el-icon><DataAnalysis /></el-icon>
-            运行性能测试
-          </el-button>
-          
-          <div v-if="benchmarkResults" class="benchmark-results">
-            <el-descriptions :column="2" border>
-              <el-descriptions-item label="单线程耗时">
-                {{ benchmarkResults.single_thread_time.toFixed(2) }}s
-              </el-descriptions-item>
-              <el-descriptions-item label="多线程耗时">
-                {{ benchmarkResults.multi_thread_time.toFixed(2) }}s
-              </el-descriptions-item>
-              <el-descriptions-item label="加速比">
-                <el-tag type="success">
-                  {{ benchmarkResults.speedup.toFixed(2) }}x
-                </el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="测试样本数">
-                {{ benchmarkResults.sample_size }}
-              </el-descriptions-item>
-            </el-descriptions>
-          </div>
-        </div>
-
-        <div class="benchmark-section">
-          <h4>多线程说明</h4>
-          <div class="info-text">
-            <p>• 多线程可以显著提高大量图片的特征提取速度</p>
-            <p>• 建议根据CPU核心数设置线程数（通常4-8个线程）</p>
-            <p>• 线程数过多可能导致内存占用过高</p>
-            <p>• 系统会自动根据图片数量选择最优处理方式</p>
-          </div>
-        </div>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
@@ -241,10 +167,6 @@ const stats = ref(null)
 const config = ref(null)
 const systemStatus = ref('healthy')
 const operationLogs = ref([])
-const showBenchmarkDialog = ref(false)
-const benchmarkLoading = ref(false)
-const benchmarkResults = ref(null)
-const workerCount = ref(4)
 
 // 加载统计信息
 const loadStats = async () => {
@@ -313,45 +235,6 @@ const addOperationLog = (type, message) => {
   // 保持最多10条日志
   if (operationLogs.value.length > 10) {
     operationLogs.value = operationLogs.value.slice(0, 10)
-  }
-}
-
-// 性能测试
-const runBenchmark = async () => {
-  benchmarkLoading.value = true
-  try {
-    const response = await searchService.benchmark(30)
-    if (response.success) {
-      benchmarkResults.value = response.data
-      ElMessage.success('性能测试完成')
-      addOperationLog('success', `性能测试完成，加速比: ${response.data.speedup.toFixed(2)}x`)
-    } else {
-      ElMessage.error('性能测试失败')
-    }
-  } catch (error) {
-    console.error('Benchmark error:', error)
-    ElMessage.error('性能测试失败')
-    addOperationLog('error', '性能测试失败')
-  } finally {
-    benchmarkLoading.value = false
-  }
-}
-
-// 设置工作线程数
-const updateWorkerCount = async () => {
-  try {
-    const response = await searchService.setWorkers(workerCount.value)
-    if (response.success) {
-      ElMessage.success(`工作线程数已设置为 ${workerCount.value}`)
-      addOperationLog('success', `工作线程数设置为 ${workerCount.value}`)
-      // 重新加载统计信息
-      await loadStats()
-    } else {
-      ElMessage.error('设置工作线程数失败')
-    }
-  } catch (error) {
-    console.error('Set workers error:', error)
-    ElMessage.error('设置工作线程数失败')
   }
 }
 

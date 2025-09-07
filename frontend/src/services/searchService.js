@@ -49,20 +49,6 @@ export const searchService = {
     return api.get('/health')
   },
 
-  // 性能基准测试
-  benchmark(sampleSize = 50) {
-    return api.post('/album/benchmark', {
-      sample_size: sampleSize
-    })
-  },
-
-  // 设置工作线程数
-  setWorkers(maxWorkers) {
-    return api.post('/album/workers', {
-      max_workers: maxWorkers
-    })
-  },
-
   // 扫描相册（支持多线程）
   scanAlbum(useMultithreading = true) {
     return api.post('/album/scan', {
