@@ -7,7 +7,7 @@ export const searchService = {
   },
 
   // 文本搜索
-  textSearch(query, k = 20, threshold = 0.3) {
+  textSearch(query, k = 20, threshold = 0.) {
     return api.post('/images/search/text', {
       query,
       k,
@@ -16,7 +16,7 @@ export const searchService = {
   },
 
   // 图像搜索
-  imageSearch(imageFile, k = 20, threshold = 0.3) {
+  imageSearch(imageFile, k = 20, threshold = 0.) {
     const formData = new FormData()
     formData.append('image', imageFile)
     formData.append('k', k)

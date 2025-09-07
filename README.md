@@ -1,4 +1,4 @@
-# CLIP 智能相册搜索系统 v2.0
+# CLIP 智能相册搜索系统 v1.1
 
 基于 Flask + Vue 的现代化相册搜索系统，支持文本搜索、图像搜索和Random Walk功能。
 
@@ -19,7 +19,7 @@
 
 ### 后端 (Flask)
 - **框架**: Flask + Flask-CORS
-- **AI模型**: OpenAI CLIP (ViT-B-32)
+- **AI模型**: OpenAI CLIP (ViT-B-16)
 - **数据库**: PyTorch 张量存储
 - **API**: RESTful API
 

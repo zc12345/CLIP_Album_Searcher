@@ -38,8 +38,8 @@ class DataBase:
         self.thread_local = threading.local()
         self.ignore_paths_lock = threading.Lock()
 
-        self.allow_cleanup_invalid_paths = False
-        self.allow_update_new_paths = False
+        self.allow_cleanup_invalid_paths = True
+        self.allow_update_new_paths = True
         
         # 创建备份目录
         if not os.path.exists(self.backup_path):
@@ -372,13 +372,13 @@ class DataBase:
     
 
 if __name__ == "__main__":
-    # db = DataBase(
-    #     root_path="D:\documents\images",
-    #     dump_path="db_zh.pt",
-    #     lang="zh-cn"
-    # )
     db = DataBase(
-        root_path="E:\\album\se",
-        dump_path="db_zh_disk.pt",
+        root_path="D:\documents\images",
+        dump_path="db_zh.pt",
         lang="zh-cn"
     )
+    # db = DataBase(
+    #     root_path="E:\\album\se",
+    #     dump_path="db_zh_disk.pt",
+    #     lang="zh-cn"
+    # )

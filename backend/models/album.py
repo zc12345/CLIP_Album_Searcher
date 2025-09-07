@@ -36,6 +36,22 @@ class Album:
         probs = (100.0 * similarity).softmax(dim=-1)
         return probs
     
+    def get_feature_search_result(self, features, k=20, threshold=0.0):
+        probs = self.query_clip_features(features)
+        
+        # 获取结果
+        if threshold > 0:
+            indices = get_indices_by_threshold(probs, threshold)
+            k = min(len(indices), k)
+            indices = indices[:k]
+        else:
+            indices = get_topk_indices(probs, k)
+        
+        # 返回结果
+        paths = [self.db_paths[i] for i in indices if i < len(self.db_paths)]
+        scores = [probs[0][i].item() for i in indices if i < len(self.db_paths)]
+        return paths, scores
+    
     def text_search(self, queries, k=20, threshold=0.0):
         """文本搜索"""
         try:
@@ -43,22 +59,7 @@ class Album:
             text_tokens = self.tokenizer(queries)
             with torch.no_grad():
                 text_features = self.model.encode_text(text_tokens)
-            
-            # 查询相似度
-            probs = self.query_clip_features(text_features)
-            
-            # 获取结果
-            if threshold > 0:
-                indices = get_indices_by_threshold(probs, threshold)
-                k = min(len(indices), k)
-                indices = indices[:k]
-            else:
-                indices = get_topk_indices(probs, k)
-            
-            # 返回结果
-            paths = [self.db_paths[i] for i in indices if i < len(self.db_paths)]
-            scores = [probs[0][i].item() for i in indices if i < len(self.db_paths)]
-            
+            paths, scores = self.get_feature_search_result(text_features, k, threshold)
             return paths, scores
         except Exception as e:
             logger.error(f"Error in text search: {e}")
@@ -71,22 +72,7 @@ class Album:
             image_tensor = self.preprocess(image).unsqueeze(0)
             with torch.no_grad():
                 image_features = self.model.encode_image(image_tensor)
-            
-            # 查询相似度
-            probs = self.query_clip_features(image_features)
-            
-            # 获取结果
-            if threshold > 0:
-                indices = get_indices_by_threshold(probs, threshold)
-                k = min(len(indices), k)
-                indices = indices[:k]
-            else:
-                indices = get_topk_indices(probs, k)
-            
-            # 返回结果
-            paths = [self.db_paths[i] for i in indices if i < len(self.db_paths)]
-            scores = [probs[0][i].item() for i in indices if i < len(self.db_paths)]
-            
+            paths, scores = self.get_feature_search_result(image_features, k, threshold)
             return paths, scores
         except Exception as e:
             logger.error(f"Error in image search: {e}")

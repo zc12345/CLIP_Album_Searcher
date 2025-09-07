@@ -33,50 +33,13 @@
       <el-skeleton :rows="6" animated />
     </div>
 
-    <div v-else-if="images.length > 0" class="image-grid">
-      <div
-        v-for="(image, index) in images"
-        :key="index"
-        class="image-card"
-      >
-        <el-image
-          :src="image.image_data"
-          :alt="image.filename"
-          fit="cover"
-          :preview-src-list="[`/api/images/original?path=${encodeURIComponent(image.path)}`]"
-          :preview-teleported="true"
-          class="image-item"
-        >
-          <template #placeholder>
-            <div class="image-placeholder">
-              <el-icon><Picture /></el-icon>
-            </div>
-          </template>
-        </el-image>
-        
-        <div class="image-actions">
-          <el-button
-            type="primary"
-            size="small"
-            @click="searchSimilar(image)"
-            :loading="searchingImage === image.path"
-          >
-            <el-icon><Search /></el-icon>
-            搜索相似图片
-          </el-button>
-          <el-button
-            size="small"
-            @click="openFolder(image.path)"
-          >
-            <el-icon><FolderOpened /></el-icon>
-            打开文件夹
-          </el-button>
-        </div>
-        
-        <div class="image-info">
-          <el-text size="small" truncated>{{ image.filename }}</el-text>
-        </div>
-      </div>
+    <div v-else-if="images.length > 0" class="content">
+      <ImageGrid
+        :images="images"
+        :searching-image="searchingImage"
+        @search-similar="searchSimilar"
+        @open-folder="openFolder"
+      />
     </div>
 
     <div v-else class="empty-state">
@@ -95,40 +58,13 @@
       <div v-if="searching" class="search-loading">
         <el-skeleton :rows="4" animated />
       </div>
-      <div v-else-if="searchResults.length > 0" class="search-results">
-        <div
-          v-for="(result, index) in searchResults"
-          :key="index"
-          class="result-card"
-        >
-          <el-image
-            :src="result.image_data"
-            :alt="result.filename"
-            fit="cover"
-            :preview-src-list="[`/api/images/original?path=${encodeURIComponent(result.path)}`]"
-            :preview-teleported="true"
-            class="result-image"
-          />
-          <div class="result-info">
-            <div class="result-score">
-              <el-tag type="success" size="small">
-                相似度: {{ (result.score * 100).toFixed(1) }}%
-              </el-tag>
-            </div>
-            <div class="result-filename">
-              <el-text size="small" truncated>{{ result.filename }}</el-text>
-            </div>
-            <div class="result-actions">
-              <el-button
-                size="small"
-                @click="openFolder(result.path)"
-              >
-                <el-icon><FolderOpened /></el-icon>
-                打开文件夹
-              </el-button>
-            </div>
-          </div>
-        </div>
+      <div v-else-if="searchResults.length > 0" class="search-content">
+        <ImageGrid
+          :images="searchResults"
+          :show-scores="true"
+          @search-similar="searchSimilarFromResults"
+          @open-folder="openFolder"
+        />
       </div>
       <div v-else class="no-results">
         <el-empty description="未找到相似的图片" />
@@ -141,6 +77,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { searchService } from '@/services/searchService'
+import ImageGrid from '@/components/ImageGrid.vue'
 
 const loading = ref(false)
 const searching = ref(false)
@@ -175,13 +112,11 @@ const searchSimilar = async (image) => {
   searchDialogVisible.value = true
   
   try {
-    // 这里需要将图片转换为文件进行搜索
-    // 由于我们已经有图片路径，可以直接使用路径搜索
     const response = await fetch(image.image_data)
     const blob = await response.blob()
     const file = new File([blob], image.filename, { type: 'image/jpeg' })
     
-    const searchResponse = await searchService.imageSearch(file, 8, 0.0)
+    const searchResponse = await searchService.imageSearch(file, 12, 0.0)
     if (searchResponse.success) {
       searchResults.value = searchResponse.data
     } else {
@@ -196,36 +131,54 @@ const searchSimilar = async (image) => {
   }
 }
 
+// 从搜索结果中再次搜索相似图片
+const searchSimilarFromResults = async (image) => {
+  searching.value = true
+  
+  try {
+    const response = await fetch(image.image_data)
+    const blob = await response.blob()
+    const file = new File([blob], image.filename, { type: 'image/jpeg' })
+    
+    const searchResponse = await searchService.imageSearch(file, 12, 0.0)
+    if (searchResponse.success) {
+      searchResults.value = searchResponse.data
+      ElMessage.success('重新搜索完成')
+    } else {
+      ElMessage.error('搜索失败')
+    }
+  } catch (error) {
+    console.error('Error searching similar images:', error)
+    ElMessage.error('搜索失败')
+  } finally {
+    searching.value = false
+  }
+}
+
 // 打开文件夹
-const openFolder = async (path) => {
+const openFolder = async (image) => {
   try {
     const response = await fetch('/api/images/open-folder', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ path })
-    });
+      body: JSON.stringify({ path: image.path })
+    })
     
-    const data = await response.json();
+    const data = await response.json()
     
     if (data.success) {
-      ElMessage.success(data.message);
+      ElMessage.success(data.message)
     } else {
-      // 如果后端打开失败，显示手动提示
-      const folderPath = path.replace(/[^/]*$/, '');
-      ElMessage.info(`自动打开失败，请手动打开: ${folderPath}`);
+      const folderPath = image.path.replace(/[^/]*$/, '')
+      ElMessage.info(`自动打开失败，请手动打开: ${folderPath}`)
     }
   } catch (error) {
-    // 网络错误时显示手动提示
-    const folderPath = path.replace(/[^/]*$/, '');
-    ElMessage.info(`网络错误，请手动打开: ${folderPath}`);
-    console.error('打开文件夹错误:', error);
+    const folderPath = image.path.replace(/[^/]*$/, '')
+    ElMessage.info(`网络错误，请手动打开: ${folderPath}`)
+    console.error('打开文件夹错误:', error)
   }
-};
-
-const getOriginalImageUrl = (imagePath) => {
-  return `/api/images/original?path=${encodeURIComponent(imagePath)}`
 }
 
 // 处理搜索对话框关闭
@@ -244,6 +197,7 @@ onMounted(() => {
 .random-walk {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 20px;
 }
 
 .page-header {
@@ -254,6 +208,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .card-header h2 {
@@ -268,55 +224,15 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .loading-container {
   padding: 20px;
 }
 
-.image-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 10px;
-}
-
-.image-card {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s;
-}
-
-.image-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.image-item {
-  width: 100%;
-  height: 200px;
-}
-
-.image-placeholder {
-  width: 100%;
-  height: 200px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f7fa;
-  color: #909399;
-  font-size: 24px;
-}
-
-.image-actions {
-  padding: 10px;
-  display: flex;
-  gap: 8px;
-}
-
-.image-info {
-  padding: 0 10px 10px;
+.content {
+  margin-top: 20px;
 }
 
 .empty-state {
@@ -328,42 +244,24 @@ onMounted(() => {
   padding: 20px;
 }
 
-.search-results {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 15px;
-}
-
-.result-card {
-  background: #f9f9f9;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.result-image {
-  width: 100%;
-  height: 150px;
-}
-
-.result-info {
-  padding: 10px;
-}
-
-.result-score {
-  margin-bottom: 8px;
-}
-
-.result-filename {
-  margin-bottom: 8px;
-}
-
-.result-actions {
-  display: flex;
-  justify-content: center;
+.search-content {
+  margin-top: 10px;
 }
 
 .no-results {
   text-align: center;
   padding: 40px;
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .header-actions {
+    justify-content: center;
+    margin-top: 10px;
+  }
 }
 </style>

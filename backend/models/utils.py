@@ -31,6 +31,11 @@ def get_topk_indices(probs, k):
     indices = torch.argsort(probs, dim=-1, descending=True)
     return indices[0][:k]
 
+def get_lastk_indices(probs, k):
+    """获取last-k索引"""
+    indices = torch.argsort(probs, dim=-1, descending=True)
+    return indices[0][-k:]
+
 def get_indices_by_threshold(probs, threshold):
     """根据阈值获取索引"""
     indices = torch.where(probs > threshold)

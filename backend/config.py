@@ -1,8 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-# load_dotenv()
-load_dotenv(dotenv_path="disk.env")
+load_dotenv()
+# load_dotenv(dotenv_path="disk.env")
 
 class Config:
     # Flask配置
@@ -27,9 +27,9 @@ class Config:
     HF_HUB_ENABLE_HF_TRANSFER = os.environ.get('HF_HUB_ENABLE_HF_TRANSFER', 'True').lower() == 'true'
     
     # API配置
-    API_VERSION = 'v1'
+    API_VERSION = 'v1.1'
     MAX_RESULTS = int(os.environ.get('MAX_RESULTS', 50))
-    DEFAULT_THRESHOLD = float(os.environ.get('DEFAULT_THRESHOLD', 0.3))
+    DEFAULT_THRESHOLD = float(os.environ.get('DEFAULT_THRESHOLD', 0.))
     
     @staticmethod
     def init_app(app):
