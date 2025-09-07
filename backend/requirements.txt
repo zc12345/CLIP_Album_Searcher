@@ -1,0 +1,8 @@
+Flask
+Flask-CORS
+Pillow
+numpy
+torch
+open-clip-torch
+python-dotenv
+werkzeug
