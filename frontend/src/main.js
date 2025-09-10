@@ -7,6 +7,7 @@ import router from './router'
 
 // 正确导入 Element Plus 图标
 import {
+  Menu,
   Picture,
   Refresh,
   Search,
@@ -28,6 +29,7 @@ const pinia = createPinia()
 
 // 手动注册需要的图标组件
 const icons = {
+  Menu,
   Picture,
   Refresh,
   Search,

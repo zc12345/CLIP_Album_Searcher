@@ -8,8 +8,7 @@
         <div class="header-content">
           <h1 @click="toggleSidebar" class="mobile-menu-trigger">
             <el-icon><Menu /></el-icon>
-            <el-icon><Picture /></el-icon>
-            CLIP 智能相册搜索
+            智能相册搜索
           </h1>
           <div class="header-actions">
             <el-button @click="refreshData" :loading="loading">

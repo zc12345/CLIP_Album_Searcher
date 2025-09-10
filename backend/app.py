@@ -6,59 +6,47 @@ from flask_cors import CORS
 import os
 from PIL import Image
 from datetime import datetime
-from PIL import Image
-import io
-import base64
 
 from config import config
 from models.album import Album
+from utils.utils import convert_results, synchronized
+from utils.logger import setup_logger
 
 # 设置HuggingFace镜像
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
 
-def convert_results(paths, scores):
-    # 转换结果
-    results = []
-    for path, score in zip(paths, scores):
-        try:
-            with Image.open(path) as img:
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-                
-                img.thumbnail((400, 400), Image.Resampling.LANCZOS)
-                
-                buffer = io.BytesIO()
-                img.save(buffer, format='JPEG', quality=85)
-                img_base64 = base64.b64encode(buffer.getvalue()).decode()
-                
-                results.append({
-                    'path': path,
-                    'filename': os.path.basename(path),
-                    'score': round(score, 4),
-                    'image_data': f'data:image/jpeg;base64,{img_base64}'
-                })
-        except Exception as e:
-            print(f"Error processing image {path}: {e}")
-            continue
-    return results
-
 _album_lock = threading.Lock()
+_album_instance = None
 
+@synchronized(_album_lock)
 def get_album_instance():
-    """获取或创建album实例（应用上下文单例）"""
-    if not hasattr(current_app, 'album_instance'):
-        with _album_lock:  # 双重检查锁定
-            if not hasattr(current_app, 'album_instance'):
-                current_app.album_instance = Album(
-                    root_path=current_app.config['ROOT_PATH'],
-                    dump_path=current_app.config['DUMP_PATH'],
-                    backup_path=current_app.config['BACKUP_PATH'],
-                    max_workers=current_app.config.get("MAX_WORKERS", 4),
-                    lang=current_app.config["ALBUM_LANGUAGE"]
-                )
-    return current_app.album_instance
+    """获取或创建album实例（应用上下文单例，线程安全）"""
+    global _album_instance
+    
+    # 首先检查全局实例是否存在
+    if _album_instance is not None:
+        return _album_instance
+    
+    # 如果全局实例不存在，检查g对象中是否有实例
+    if hasattr(g, 'album_instance'):
+        return g.album_instance
+    
+    # 创建新实例
+    current_app.logger.info("Initializing Album instance")
+    _album_instance = Album(
+        root_path=current_app.config['ROOT_PATH'],
+        dump_path=current_app.config['DUMP_PATH'],
+        backup_path=current_app.config['BACKUP_PATH'],
+        max_workers=current_app.config.get("MAX_WORKERS", 4),
+        lang=current_app.config["ALBUM_LANGUAGE"]
+    )
+    
+    # 同时设置到g对象中
+    g.album_instance = _album_instance
+    
+    return _album_instance
 
 
 def create_app(config_name='default'):
@@ -81,7 +69,12 @@ def create_app(config_name='default'):
     
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
-    app.logger.debug(f"config={config[config_name]}")
+
+    # 设置日志
+    setup_logger(app)
+    
+    app.logger.info(f"Application started with config: {config_name}")
+    app.logger.debug(f"Config details: {dict(app.config)}")
     
     # 启用CORS
     CORS(app, resources={
@@ -97,6 +90,7 @@ def create_app(config_name='default'):
         album_instance = g.pop('album_instance', None)
         if album_instance is not None:
             # 清理资源（如果需要）
+            app.logger.debug("Cleaning up Album instance from g object")
             pass
 
     @app.before_request
@@ -107,20 +101,39 @@ def create_app(config_name='default'):
     # 错误处理
     @app.errorhandler(400)
     def bad_request(error):
+        app.logger.warning(f"Bad request: {error}")
         return jsonify({'error': 'Bad request'}), 400
     
     @app.errorhandler(404)
     def not_found(error):
+        app.logger.warning(f"Not found: {request.path}")
         return jsonify({'error': 'Not found'}), 404
     
     @app.errorhandler(500)
     def internal_error(error):
+        app.logger.error(f"Internal server error: {error}")
         return jsonify({'error': 'Internal server error'}), 500
+    
+    @app.route('/api/test/log', methods=['GET'])
+    def test_log_levels():
+        """测试日志级别"""
+        app.logger.debug('This is a DEBUG message')
+        app.logger.info('This is an INFO message')
+        app.logger.warning('This is a WARNING message')
+        app.logger.error('This is an ERROR message')
+        app.logger.critical('This is a CRITICAL message')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Log levels tested',
+            'log_level': current_app.config.get('LOG_LEVEL', 'INFO')
+        })
     
     # API路由
     @app.route('/api/health', methods=['GET'])
     def health_check():
         """健康检查"""
+        app.logger.debug("Health check requested")
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
@@ -138,7 +151,8 @@ def create_app(config_name='default'):
             random_paths = album.get_random_images(count)
             scores_placeholder = [0] * len(random_paths)
             images_data = convert_results(random_paths, scores_placeholder)
-            
+
+            app.logger.info(f"Returned {len(images_data)} random images")
             return jsonify({
                 'success': True,
                 'data': images_data,
@@ -146,6 +160,7 @@ def create_app(config_name='default'):
             })
             
         except Exception as e:
+            app.logger.error(f"Error in get_random_images: {e}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -160,11 +175,13 @@ def create_app(config_name='default'):
             query = data.get('query', '')
             
             if not query:
+                app.logger.warning("Text search called without query")
                 return jsonify({
                     'success': False,
                     'error': 'Query is required'
                 }), 400
             
+            app.logger.info(f"Text search query: '{query}'")
             # 限制参数范围
             k = data.get('k', 8)
             threshold = data.get('threshold', app.config['DEFAULT_THRESHOLD'])
@@ -173,7 +190,8 @@ def create_app(config_name='default'):
             
             paths, scores = album.text_search([query], k=k, threshold=threshold)
             results = convert_results(paths, scores)
-            
+
+            app.logger.info(f"Text search found {len(results)} results for query: '{query}'")
             return jsonify({
                 'success': True,
                 'data': results,
@@ -182,6 +200,7 @@ def create_app(config_name='default'):
             })
             
         except Exception as e:
+            app.logger.error(f"Error in text_search: {e}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -194,6 +213,7 @@ def create_app(config_name='default'):
         album = get_album_instance()
         try:
             if 'image' not in request.files:
+                app.logger.warning("Image search called without provide image")
                 return jsonify({
                     'success': False,
                     'error': 'No image file provided'
@@ -201,6 +221,7 @@ def create_app(config_name='default'):
             
             file = request.files['image']
             if file.filename == '':
+                app.logger.warning("Image search called without selected image")
                 return jsonify({
                     'success': False,
                     'error': 'No image selected'
@@ -221,6 +242,7 @@ def create_app(config_name='default'):
             paths, scores = album.image_search(image, k=k, threshold=threshold)
             results = convert_results(paths, scores)
             
+            app.logger.info(f"Image search found {len(results)} results for query")
             return jsonify({
                 'success': True,
                 'data': results,
@@ -228,6 +250,7 @@ def create_app(config_name='default'):
             })
             
         except Exception as e:
+            app.logger.error(f"Error in image_search: {e}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -550,4 +573,9 @@ def create_app(config_name='default'):
 
 if __name__ == '__main__':
     app = create_app('development')
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    try:
+        app.logger.info("Starting Flask application")
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    except Exception as e:
+        app.logger.error(f"Failed to start application: {e}")
+        raise
